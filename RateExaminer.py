@@ -32,6 +32,34 @@ class RateExaminer:
         with open(self.json_file, "w") as file:
             json.dump({"data": []}, file)
 
+    """################################################################################# UI
+    """  #################################################################################
+
+    def main_loop(self):
+        while True:
+            menu_items = [
+                {"text": f"Enter URL ( current: {self.url} )", "func": self.enter_url},
+                {"text": f"Start operation", "func": self.start_operation},
+            ]
+            self.show_menu(menu_items)
+
+    def show_menu(self, given_array):
+        print("MENU OF OPTIONS")
+        for i in range(len(given_array)):
+            print(f"{i}:\t{given_array[i]['text']}")
+
+        while True:
+            user_input = input("Select an option from list above by its number: ")
+            if user_input.isdigit() and int(user_input) < len(given_array):
+                given_array[int(user_input)]["func"]()
+                print("################################################\n\n")
+                break
+            else:
+                print("Invalid input")
+
+    def enter_url(self):
+        pass
+
     """################################################################################# saving & log
     """  #################################################################################
 
@@ -44,3 +72,9 @@ class RateExaminer:
     def read_json(self):
         with open(self.json_file, "r") as f:
             return json.load(f)
+
+    """################################################################################# main
+    """  #################################################################################
+
+    def start_operation(self):
+        pass
