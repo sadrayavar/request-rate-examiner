@@ -10,7 +10,7 @@ class RateExaminer:
     request_id = 0
     url = "http://localhost/"
     requests_ok = True
-    precision = {"timeframe": 1, "blocktime": 1, "request": 1}
+    precision = {"timeframe": 5, "blocktime": 5, "request": 5}
 
     timeframe = {"min": 0, "max": 4, "last_decreased": ""}
     fallbacker = {"value": timeframe["max"], "decrease_twice": False}
@@ -146,10 +146,8 @@ class RateExaminer:
             # exit point
             if stop_on_block and not self.requests_ok:
                 self.requests_ok = True
-                return i
-            thread = threading.Thread(
-                target=self.send_req, args=(i, False, log_enabled)
-            )
+                break
+            thread = threading.Thread(target=self.send_req, args=(i, True, log_enabled))
             thread.start()
             threads.append(thread)
 
@@ -160,6 +158,11 @@ class RateExaminer:
         # Wait for all threads to finish
         for thread in threads:
             thread.join()
+
+        # handle returning
+        results = self.thread_results
+        self.thread_results = []
+        return results
 
     def am_i_blocked(self):
         response = self.send_req(id=0)
@@ -215,12 +218,14 @@ class RateExaminer:
     """  #################################################################################
 
     def start_operation(self):
-        n = None
+        n = 0
         b = None
         t = None
 
         # calculating maximum request we are able to send in one second
-        n = self.start_threads(number=100, given_time=0.1, stop_on_block=True)
+        results = self.start_threads(number=100, given_time=0.1, stop_on_block=True)
+        for res in results:
+            n += (1) if (res["ok"]) else (0)
         self.log(
             f"Maximum possible request number (n) is about: {n} (+- {self.precision['request']})"
         )
@@ -230,6 +235,18 @@ class RateExaminer:
         self.log(
             f"---It took {max_b_t}(+- {self.precision['timeframe']}) seconds to get unblocked."
         )
+
+        self.log(
+            f"Starting to end {int(1.5*n)} request in {max_b_t} seconds in order to find rate limiter system type"
+        )
+        self.start_threads(number=int(1.5 * n), given_time=max_b_t, stop_on_block=False)
+        if self.am_i_blocked():
+            self.log("Target rate limiter is type 1 (0 <= b <= t)")
+            t = max_b_t
+            self.start_threads(number=2 * n, given_time=t, stop_on_block=True)
+            b = self.unblocked_after(test_every=self.precision["blocktime"])
+
+        self.log(f"n={n}; b={b}; t={t}")
 
 
 RateExaminer()
