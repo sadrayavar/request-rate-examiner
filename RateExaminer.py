@@ -9,8 +9,8 @@ class RateExaminer:
     thread_results = []
     request_id = 0
     url = "http://localhost/"
-    requests_blocked = False
-    precision = {"time": 1, "request": 1}
+    requests_ok = True
+    precision = {"timeframe": 1, "blocktime": 1, "request": 1}
 
     timeframe = {"min": 0, "max": 4, "last_decreased": ""}
     fallbacker = {"value": timeframe["max"], "decrease_twice": False}
@@ -53,8 +53,9 @@ class RateExaminer:
         while True:
             user_input = input("Select an option from list above by its number: ")
             if user_input.isdigit() and int(user_input) < len(given_array):
+                print("\n")
                 given_array[int(user_input)]["func"]()
-                print("################################################\n\n")
+                print("\n")
                 break
             else:
                 print("Invalid input")
@@ -102,35 +103,30 @@ class RateExaminer:
         print(f"{level+': ' if level!='INFO' else ''}{log_text}")
         logging.log(getattr(logging, level.upper()), log_text)
 
-    """################################################################################# general
+    """################################################################################# request
     """  #################################################################################
 
-    def send_req(self, save_to_results=False, log_enabled=False):
+    def send_req(self, id, save_to_results=False, log_enabled=False):
         try:
-            request_id = (
-                self.request_id
-            )  # saving in function's own stack so the other threads doesnt change it
-
             # send request and calculate elapsed time
             request_time = time.time()  # saving request sent time
             response = requests.get(self.url)
             elapsed_time = time.time() - request_time
 
             # check if request is blocked or not
-            self.requests_blocked = False
             good_codes = [200, 201, 202, 203, 204, 205, 206, 207, 208, 226]
-            if response.status_code not in good_codes:
-                self.requests_blocked = True
+            condition = response.status_code in good_codes  # is not blocked
+            self.requests_ok = (True) if (condition) else (False)
 
             # Log the response
             if log_enabled:
-                log_text = f"Response {request_id} status code is: {response.status_code}. time took to get the response: {elapsed_time}"
-                log_type = "ERROR" if self.requests_blocked else "INFO"
+                log_text = f"Response {id} status code is: {response.status_code}. time took to get the response: {elapsed_time}"
+                log_type = "INFO" if self.requests_ok else "ERROR"
                 self.log(log_text, log_type)
 
             # returning back the results
             return_value = {
-                "ok": self.requests_blocked,
+                "ok": self.requests_ok,
                 "code": response.status_code,
                 "time": elapsed_time,
             }
@@ -142,39 +138,41 @@ class RateExaminer:
             self.log(f"Request failed: Error - {e}", "ERROR")
 
     def start_threads(
-        self, number, given_time=False, log_enabled=False, stop_on_block=True
+        self, number, given_time=False, log_enabled=False, stop_on_block=False
     ):
         # Start the thread
         threads = []
         for i in range(number):
             # exit point
-            if stop_on_block and self.requests_blocked:
-                self.requests_blocked = False
+            if stop_on_block and not self.requests_ok:
+                self.requests_ok = True
                 return i
-            thread = threading.Thread(target=self.send_req, args=(True, log_enabled))
+            thread = threading.Thread(
+                target=self.send_req, args=(i, False, log_enabled)
+            )
             thread.start()
-            self.request_id += 1
             threads.append(thread)
-            if given_time:
-                time.sleep(given_time / number)
+
+            # spread request accros given time
+            if given_time and (i != number - 1):
+                time.sleep(given_time / (number - 1))
 
         # Wait for all threads to finish
         for thread in threads:
             thread.join()
 
-        # reset requests id
-        self.request_id = 0
-
     def am_i_blocked(self):
-        test_req = self.send_req()
-        self.log(
-            f"According to test result: you are{' not' if test_req['ok'] else ''} blocked",
-            "INFO" if test_req["ok"] else "ERROR",
-        )
-        return not test_req["ok"]
+        response = self.send_req(id=0)
+        log_text = f"According to test result: you are{' not' if response['ok'] else ''} blocked"
+        log_level = "INFO" if response["ok"] else "ERROR"
+        self.log(log_text, log_level)
+        return not response["ok"]
 
-    """################################################################################# main
+    """################################################################################# main method
     """  #################################################################################
 
     def start_operation(self):
         pass
+
+
+RateExaminer()
