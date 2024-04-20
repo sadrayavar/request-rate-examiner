@@ -32,6 +32,8 @@ class RateExaminer:
         with open(self.json_file, "w") as file:
             json.dump({"data": []}, file)
 
+        self.main_loop()
+
     """################################################################################# UI
     """  #################################################################################
 
@@ -58,7 +60,15 @@ class RateExaminer:
                 print("Invalid input")
 
     def enter_url(self):
-        pass
+        while True:
+            url = input(f"\nEnter your desired URL: ( current is: {self.url} ) ")
+            if url == "0":
+                return
+            else:
+                self.url = url
+                self.log(f"the target URL changed to {url}")
+                break
+
 
     """################################################################################# saving & log
     """  #################################################################################
