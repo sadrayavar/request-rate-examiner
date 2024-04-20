@@ -1,4 +1,4 @@
-import os, json
+import os, json, logging, time, requests
 from datetime import datetime
 
 
@@ -9,7 +9,7 @@ class RateExaminer:
     thread_results = []
     request_id = 0
     url = "http://localhost/"
-    requests_blocked = True
+    requests_blocked = False
     precision = {"time": 1, "request": 1}
 
     timeframe = {"min": 0, "max": 4, "last_decreased": ""}
@@ -69,7 +69,6 @@ class RateExaminer:
                 self.log(f"the target URL changed to {url}")
                 break
 
-
     """################################################################################# saving & log
     """  #################################################################################
 
@@ -82,6 +81,65 @@ class RateExaminer:
     def read_json(self):
         with open(self.json_file, "r") as f:
             return json.load(f)
+
+    def log(self, message, level="INFO"):
+        # Configure logging (optional for basic usage)
+        logging.basicConfig(
+            filename=self.log_file,
+            level=logging.INFO,
+            format="[%(asctime)s] [%(levelname)s] %(message)s",
+        )
+
+        # Validate log level
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if level not in valid_levels:
+            raise ValueError(
+                f"Invalid log level: '{level}'. Valid levels are: {', '.join(valid_levels)}"
+            )
+
+        # Log the message using the logging module
+        log_text = f"{message}"
+        print(f"{level+': ' if level!='INFO' else ''}{log_text}")
+        logging.log(getattr(logging, level.upper()), log_text)
+
+    """################################################################################# general
+    """  #################################################################################
+
+    def send_req(self, save_to_results=False, log_enabled=False):
+        try:
+            request_id = (
+                self.request_id
+            )  # saving in function's own stack so the other threads doesnt change it
+
+            # send request and calculate elapsed time
+            request_time = time.time()  # saving request sent time
+            response = requests.get(self.url)
+            elapsed_time = time.time() - request_time
+
+            # check if request is blocked or not
+            self.requests_blocked = False
+            good_codes = [200, 201, 202, 203, 204, 205, 206, 207, 208, 226]
+            if response.status_code not in good_codes:
+                self.requests_blocked = True
+
+            # Log the response
+            if log_enabled:
+                log_text = f"Response {request_id} status code is: {response.status_code}. time took to get the response: {elapsed_time}"
+                log_type = "ERROR" if self.requests_blocked else "INFO"
+                self.log(log_text, log_type)
+
+            # returning back the results
+            return_value = {
+                "ok": self.requests_blocked,
+                "code": response.status_code,
+                "time": elapsed_time,
+            }
+            if save_to_results:
+                self.thread_results.append(return_value)
+            return return_value
+
+        except requests.exceptions.RequestException as e:
+            self.log(f"Request failed: Error - {e}", "ERROR")
 
     """################################################################################# main
     """  #################################################################################
