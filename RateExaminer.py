@@ -168,11 +168,68 @@ class RateExaminer:
         self.log(log_text, log_level)
         return not response["ok"]
 
+    """################################################################################# find unblock time
+    """  #################################################################################
+
+    def unblocked_after(self, test_every=5):
+        timestamp = None
+        real_passed_time = 0
+        expected_passed_time = 0
+
+        pass_num = 0
+        while True:
+            # handle pass seperation
+            pass_num += 1
+            self.log(f"Pass number {pass_num} started")
+
+            # calculating elapsed time
+            elapsed_time = (time.time() - timestamp) if (timestamp) else 0
+            self.log(
+                f"Elapsed time for request and code execution is about {elapsed_time} seconds"
+            )
+
+            # handle waiting time
+            temp_time = test_every - elapsed_time
+            temp_time -= real_passed_time - expected_passed_time
+            wait_for = max(temp_time, 0)
+            self.log(f"Starting to wait for {wait_for} seconds")
+
+            # save real and expected passed time
+            expected_passed_time += test_every
+            real_passed_time += max(wait_for, test_every)
+            self.log(
+                f"Passed time is {real_passed_time}. time that must be passed untill now is {expected_passed_time}."
+            )
+
+            # wait
+            time.sleep(wait_for)
+
+            # returning result
+            if not self.am_i_blocked():
+                return real_passed_time
+
+            # setting timestamp for future calcuation
+            timestamp = time.time()
+
     """################################################################################# main method
     """  #################################################################################
 
     def start_operation(self):
-        pass
+        n = None
+        b = None
+        t = None
+
+        # calculating maximum request we are able to send in one second
+        n = self.start_threads(number=100, given_time=0.1, stop_on_block=True)
+        self.log(
+            f"Maximum possible request number (n) is about: {n} (+- {self.precision['request']})"
+        )
+
+        self.log(f"---starting to find how much time takes to get unblocked")
+        max_b_t = self.unblocked_after(test_every=self.precision["timeframe"])
+        self.log(
+            f"---It took {max_b_t}(+- {self.precision['timeframe']}) seconds to get unblocked."
+        )
 
 
 RateExaminer()
