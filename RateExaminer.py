@@ -1,4 +1,4 @@
-import os, json, logging, time, requests
+import os, json, logging, time, requests, threading
 from datetime import datetime
 
 
@@ -140,6 +140,30 @@ class RateExaminer:
 
         except requests.exceptions.RequestException as e:
             self.log(f"Request failed: Error - {e}", "ERROR")
+
+    def start_threads(
+        self, number, given_time=False, log_enabled=False, stop_on_block=True
+    ):
+        # Start the thread
+        threads = []
+        for i in range(number):
+            # exit point
+            if stop_on_block and self.requests_blocked:
+                self.requests_blocked = False
+                return i
+            thread = threading.Thread(target=self.send_req, args=(True, log_enabled))
+            thread.start()
+            self.request_id += 1
+            threads.append(thread)
+            if given_time:
+                time.sleep(given_time / number)
+
+        # Wait for all threads to finish
+        for thread in threads:
+            thread.join()
+
+        # reset requests id
+        self.request_id = 0
 
     """################################################################################# main
     """  #################################################################################
