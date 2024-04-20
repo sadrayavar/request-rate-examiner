@@ -165,6 +165,14 @@ class RateExaminer:
         # reset requests id
         self.request_id = 0
 
+    def am_i_blocked(self):
+        test_req = self.send_req()
+        self.log(
+            f"According to test result: you are{' not' if test_req['ok'] else ''} blocked",
+            "INFO" if test_req["ok"] else "ERROR",
+        )
+        return not test_req["ok"]
+
     """################################################################################# main
     """  #################################################################################
 
